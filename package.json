@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "workspaces": [
+    "web",
+    "crates/tongue-sim/pkg"
+  ],
+  "scripts": {
+    "wasm": "cd crates/tongue-sim && wasm-pack build --target web --release",
+    "wasm:dev": "cd crates/tongue-sim && wasm-pack build --target web --dev",
+    "build": "npm run wasm && cd web && npm run build",
+    "dev": "npm run wasm:dev && cd web && npm run dev"
+  }
+}

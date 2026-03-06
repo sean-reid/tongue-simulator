@@ -1,0 +1,21 @@
+# Rust
+/target/
+crates/tongue-sim/pkg/
+
+# Node
+node_modules/
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+*.wasm
+*.d.ts.map
