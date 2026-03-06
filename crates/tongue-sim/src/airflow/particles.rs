@@ -2,7 +2,7 @@ use crate::anatomy::Vec2;
 use crate::airflow::AreaFunction;
 
 const MAX_PARTICLES: usize = 100;
-const PARTICLE_LIFETIME_MS: f64 = 300.0;
+const PARTICLE_LIFETIME_MS: f64 = 500.0;
 const GLOTTIS_X: f64 = 15.0;
 const GLOTTIS_Y: f64 = 3.0;
 
@@ -50,11 +50,11 @@ impl ParticleSystem {
                 && self.particles.len() < MAX_PARTICLES
             {
                 let rand_y = self.rand_f(-1.0, 1.0);
-                let rand_vx = flow_v * 0.05 * glottal_aperture;
+                let init_vx = 40.0 + glottal_aperture * 120.0; // mm/s base forward speed
                 let rand_vy = self.rand_f(-0.5, 0.5);
                 self.particles.push(Particle {
                     position: Vec2::new(GLOTTIS_X, GLOTTIS_Y + rand_y),
-                    velocity: Vec2::new(rand_vx, rand_vy),
+                    velocity: Vec2::new(init_vx, rand_vy * 8.0),
                     age_ms: 0.0,
                     turbulence: 0.0,
                     opacity: 1.0,
@@ -75,11 +75,18 @@ impl ParticleSystem {
             p.age_ms += dt_ms;
 
             let area = area_at_x(area_fn, p.position.x);
-            let local_speed = if area > 0.01 { flow_v / area.max(0.5) } else { flow_v };
 
-            p.velocity.x = local_speed.min(500.0) * 0.1;
-            p.velocity.y += randoms[i] * (1.0 / area.max(0.1)).min(3.0);
-            p.velocity.y *= 0.95;
+            // Drive x-velocity by conservation of flow: narrower area → faster.
+            let area_cm2 = area.max(0.05);
+            let flow_drive = 120.0 * glottal_aperture.max(0.2);
+            p.velocity.x = (flow_drive * 3.0 / area_cm2).min(500.0);
+
+            // Guide particle toward the vocal tract centreline (pharynx curves up,
+            // oral cavity is roughly flat).  Without this, particles scatter randomly.
+            let target_y = tract_centerline_y(p.position.x);
+            p.velocity.y += (target_y - p.position.y) * 3.0
+                + randoms[i] * (0.5 / area.max(0.1)).min(1.5);
+            p.velocity.y *= 0.85; // stronger damping keeps particles on-path
 
             p.position.x += p.velocity.x * dt;
             p.position.y += p.velocity.y * dt;
@@ -108,6 +115,19 @@ impl ParticleSystem {
         let r = (self.rand_u64() >> 11) as f64 / (1u64 << 53) as f64;
         lo + r * (hi - lo)
     }
+}
+
+/// Approximate vocal-tract centreline y-coordinate at a given x (mm).
+/// Pharynx (x=15→52): curves upward from y≈3 to y≈24.
+/// Oral cavity (x=52→165): roughly flat ~y=24, slight downward slope.
+fn tract_centerline_y(x: f64) -> f64 {
+    if x <= 15.0 { return 3.0; }
+    if x < 52.0 {
+        let t = (x - 15.0) / (52.0 - 15.0);
+        return 3.0 + t * 21.0;
+    }
+    let t = (x - 52.0) / (165.0 - 52.0);
+    24.0 - t * 2.0
 }
 
 fn area_at_x(area_fn: &AreaFunction, x: f64) -> f64 {

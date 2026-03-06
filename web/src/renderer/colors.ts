@@ -1,39 +1,57 @@
 /// Color palette for the vocal tract renderer.
+/// Palette designed to resemble a midsagittal anatomical diagram.
 
 export const COLORS = {
-  background: '#FAFAFA',
-  // Tissues
-  tongue: '#E8A0A0',
-  tongueDorsal: '#D08080',
-  mucosa: '#E8A0A0',
-  bone: '#F5E6D3',
-  pharyngealWall: '#D4A0A0',
+  background: '#F7F4EF',
+  // Outer head silhouette
+  headSkin: 'rgba(224, 195, 165, 0.35)',
+  headSkinStroke: 'rgba(150, 110, 80, 0.3)',
+  // Posterior tissue (prevertebral / pharyngeal constrictor mass)
+  pharyngealTissueFill: 'rgba(165, 118, 98, 0.35)',
+  // Cranium / skull / maxilla region
+  craniumFill: '#EDE6D8',
+  craniumStroke: 'rgba(180, 160, 130, 0.5)',
+  // Mucosa / tissue
+  tongue: '#CC6666',
+  tongueDorsal: '#AA4444',
+  tongueHighlight: '#E88888',
+  mucosa: '#C85858',
+  // Soft tissue (floor of mouth, gum)
+  softTissue: 'rgba(195, 115, 105, 0.55)',
+  gum: '#C07070',
   // Hard / soft palate
-  palate: '#F0D8C0',
-  palateStroke: '#C8A880',
-  // Jaw and teeth
-  mandible: '#E8D8C0',
-  teeth: '#FAFFF0',
-  teethStroke: '#D0C8A0',
-  // Lips
-  upperLip: '#E8A0A0',
-  lowerLip: '#E8A0A0',
-  lipStroke: '#C07070',
+  palate: '#ECD8B8',
+  palateStroke: '#B89860',
+  palateInner: 'rgba(210, 155, 125, 0.6)',
+  // Pharyngeal wall
+  pharyngealWall: '#A07060',
+  // Jaw bone
+  mandible: '#E8DCC8',
+  mandibleStroke: '#A89060',
+  // Teeth
+  teeth: '#F8FFF2',
+  teethStroke: '#C0B888',
+  // Lips (flesh-toned, slightly darker than skin)
+  upperLip: '#D48878',
+  lowerLip: '#D48878',
+  lipStroke: '#A05050',
   // Velum / soft palate
-  velum: '#F0C8B0',
-  velumStroke: '#C8906080',
-  // Nasal cavity
-  nasalCavityFill: 'rgba(210, 230, 255, 0.25)',
-  nasalCavityStroke: 'rgba(150, 180, 220, 0.4)',
+  velum: '#DDB898',
+  velumStroke: '#A07050',
+  // Nasal cavity air space
+  nasalCavityFill: 'rgba(195, 220, 245, 0.45)',
+  nasalCavityStroke: 'rgba(130, 165, 205, 0.5)',
   // Trachea
-  trachea: 'rgba(180, 200, 220, 0.4)',
-  // Outline
-  outline: '#555555',
+  trachea: 'rgba(160, 190, 215, 0.5)',
+  // Bone generic
+  bone: '#EDE6D8',
+  // Outline (dark but not pure black — like ink illustration)
+  outline: '#3A3028',
   // Airflow particles
-  particleBase: 'rgba(100, 180, 255, 0.5)',
-  particleTurbulent: 'rgba(255, 100, 100, 0.65)',
+  particleBase: 'rgba(80, 160, 240, 0.55)',
+  particleTurbulent: 'rgba(240, 90, 90, 0.7)',
   // Voicing glow
-  voicingGlow: 'rgba(255, 200, 100, 0.3)',
+  voicingGlow: 'rgba(255, 195, 80, 0.35)',
   // IPA label
   ipaText: '#2563EB',
   // Active word

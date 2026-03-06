@@ -44,16 +44,29 @@ export function drawTongue(
     ctx.closePath();
   }
 
-  // Gradient fill: slightly darker at edges
+  // Gradient fill: anatomical tongue pink — lighter midline, darker edges
   const midX = (dorsal[7]?.[0] ?? cw / 2);
   const midY = (dorsal[7]?.[1] ?? ch / 2);
-  const grad = ctx.createRadialGradient(midX, midY, 0, midX, midY, 60 * scale);
-  grad.addColorStop(0, '#EEB0B0');
-  grad.addColorStop(1, '#D08080');
+  const tongueRadius = 70 * scale;
+  const grad = ctx.createRadialGradient(midX, midY - tongueRadius * 0.15, 0, midX, midY, tongueRadius);
+  grad.addColorStop(0,   '#D97070');   // bright centre
+  grad.addColorStop(0.5, '#C05858');   // mid
+  grad.addColorStop(1,   '#8F3838');   // dark edge
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Dorsal outline (heavier)
+  // Subtle sheen highlight along dorsal midline
+  if (smoothDorsal.length > 4) {
+    const hi = smoothDorsal.slice(2, smoothDorsal.length - 2);
+    ctx.beginPath();
+    ctx.moveTo(hi[0][0], hi[0][1]);
+    for (let i = 1; i < hi.length; i++) ctx.lineTo(hi[i][0], hi[i][1]);
+    ctx.strokeStyle = 'rgba(255,180,180,0.25)';
+    ctx.lineWidth = 4 * scale;
+    ctx.stroke();
+  }
+
+  // Dorsal outline
   ctx.beginPath();
   if (smoothDorsal.length > 0) {
     ctx.moveTo(smoothDorsal[0][0], smoothDorsal[0][1]);
@@ -61,11 +74,11 @@ export function drawTongue(
       ctx.lineTo(smoothDorsal[i][0], smoothDorsal[i][1]);
     }
   }
-  ctx.strokeStyle = COLORS.outline;
+  ctx.strokeStyle = 'rgba(80, 30, 30, 0.75)';
   ctx.lineWidth = 1.5 * scale;
   ctx.stroke();
 
-  // Ventral outline (lighter)
+  // Ventral outline (lighter — interior surface)
   ctx.beginPath();
   if (smoothVentral.length > 0) {
     ctx.moveTo(smoothVentral[0][0], smoothVentral[0][1]);
@@ -73,7 +86,7 @@ export function drawTongue(
       ctx.lineTo(smoothVentral[i][0], smoothVentral[i][1]);
     }
   }
-  ctx.strokeStyle = 'rgba(150,80,80,0.5)';
+  ctx.strokeStyle = 'rgba(120, 55, 55, 0.4)';
   ctx.lineWidth = scale;
   ctx.stroke();
 

@@ -29,7 +29,7 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
   const lastEstimatedTimeRef = useRef<number>(0);
   // Current time-stretch factor (actual / estimated)
   const stretchRef = useRef<number>(1.0);
-  const stretchEmaRef = useRef(new EMA(1.0, 50));
+  const stretchEmaRef = useRef(new EMA(1.0, 6));
   // Whether we've received any boundary events (to detect fallback mode)
   const gotBoundaryRef = useRef(false);
   const fallbackModeRef = useRef(false);
@@ -39,8 +39,10 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
     startWallTimeRef.current = performance.now();
     lastActualTimeRef.current = 0;
     lastEstimatedTimeRef.current = 0;
-    stretchRef.current = 1.0;
-    stretchEmaRef.current = new EMA(1.0, 50);
+    // Pre-stretch at 1.8: TTS is typically ~1.5-2x slower than the phoneme model.
+    // EMA window=6 adapts quickly once boundary events arrive.
+    stretchRef.current = 1.8;
+    stretchEmaRef.current = new EMA(1.8, 6);
     gotBoundaryRef.current = false;
     fallbackModeRef.current = false;
     totalDurationRef.current = totalDurationMs;
@@ -52,12 +54,12 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
       currentWord: wordSyncMap[0]?.word ?? '',
     });
 
-    // Check for fallback mode after 600ms
+    // Fallback mode if no boundary events received after 1200ms
     setTimeout(() => {
       if (!gotBoundaryRef.current) {
         fallbackModeRef.current = true;
       }
-    }, 600);
+    }, 1200);
   }, [wordSyncMap]);
 
   const onBoundary = useCallback(
@@ -107,8 +109,9 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
       const elapsed = wallTimeMs - startWallTimeRef.current;
 
       if (fallbackModeRef.current) {
-        // Open-loop: directly use wall-clock time (no correction available)
-        return elapsed;
+        // Open-loop: use pre-stretched wall-clock time — TTS is typically slower
+        // than the phoneme model, so divide elapsed by the same stretch factor.
+        return elapsed / stretchRef.current;
       }
 
       // Adaptive warp: scale elapsed time by running stretch factor

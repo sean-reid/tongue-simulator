@@ -1,9 +1,8 @@
 import { RefObject, useEffect, useRef } from 'react';
 import type { RenderState, Settings } from '../types/simulation';
-import { drawVocalTract } from '../renderer/drawTract';
+import { drawVocalTract, drawMandibleBone, drawRigidBodies, drawVoicingIndicator, drawIPALabel } from '../renderer/drawTract';
 import { drawTongue } from '../renderer/drawTongue';
 import { drawAirflow } from '../renderer/drawAirflow';
-import { drawRigidBodies, drawVoicingIndicator, drawIPALabel } from '../renderer/drawTract';
 
 interface AnimationLoopOptions {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -58,8 +57,9 @@ export function useAnimationLoop({
       if (state) {
         // Draw in layer order (back → front)
         drawVocalTract(ctx, canvas.width, canvas.height);
-        drawTongue(ctx, state, canvas.width, canvas.height);
-        drawRigidBodies(ctx, state, canvas.width, canvas.height);
+        drawMandibleBone(ctx, state.jaw_angle, canvas.width, canvas.height); // behind tongue
+        drawTongue(ctx, state, canvas.width, canvas.height);                 // tongue on top
+        drawRigidBodies(ctx, state, canvas.width, canvas.height);            // teeth/velum/lips in front
         if (settings.showAirflow) {
           drawAirflow(ctx, state, canvas.width, canvas.height);
         }

@@ -45,7 +45,7 @@ export function drawVocalTract(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // 1. Nasal cavity fill
+  // 1. Nasal cavity air space
   drawNasalCavity(ctx, toCanvas, scale);
 
   // 2. Pharyngeal wall
@@ -63,6 +63,25 @@ export function drawVocalTract(
   // 6. Upper teeth
   drawUpperTeeth(ctx, toCanvas, scale);
 
+  // 7. Face profile outline (drawn last so it sits on top of other structures)
+  drawFaceProfile(ctx, toCanvas, scale);
+
+  ctx.restore();
+}
+
+/** Draw just the mandible bone — exported so the animation loop can draw it
+ *  before the tongue, keeping the tongue on top. */
+export function drawMandibleBone(
+  ctx: CanvasRenderingContext2D,
+  jawAngle: number,
+  cw: number,
+  ch: number
+) {
+  const { toCanvas, scale } = buildTransform(cw, ch);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  drawMandible(ctx, jawAngle, toCanvas, scale);
   ctx.restore();
 }
 
@@ -79,8 +98,7 @@ export function drawRigidBodies(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Mandible outline (jaw open = rotate lower boundary downward)
-  drawMandible(ctx, state.jaw_angle, toCanvas, scale);
+  // (Mandible is drawn before the tongue via drawMandibleBone — not here)
 
   // Lower teeth (move with jaw)
   drawLowerTeeth(ctx, state.jaw_angle, toCanvas, scale);
@@ -142,6 +160,79 @@ export function drawIPALabel(
 // ─────────────────────────────────────────────
 // Static anatomy drawing helpers
 // ─────────────────────────────────────────────
+
+function drawFaceProfile(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Human face profile in midsagittal (right-facing) view.
+  // Uses quadratic bezier curves for organic, realistic shape.
+  // Reference landmarks: glabella → nasion → nasal dorsum → pronasale →
+  //   columella → subnasale → philtrum → upper lip → stomion →
+  //   lower lip → labiomental fold → pogonion → gnathion → neck.
+
+  const tc = (x: number, y: number): [number, number] => toCanvas(x, y);
+  const strokeColor = 'rgba(110, 78, 54, 0.55)';
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // ── Main profile contour ──────────────────────────────────────────────────
+  ctx.beginPath();
+  ctx.moveTo(...tc(162, 79));           // glabella
+
+  // Forehead slightly forward, then nasion indentation at bridge
+  ctx.quadraticCurveTo(...tc(163, 74), ...tc(164, 70));  // nasion (bridge concavity)
+
+  // Nasal dorsum: slopes forward from bridge to tip
+  ctx.quadraticCurveTo(...tc(171, 62), ...tc(175, 56));  // mid-dorsum
+  ctx.quadraticCurveTo(...tc(177, 52), ...tc(176, 49));  // supra-tip / pronasale
+
+  // Columella: curves back down from nasal tip to subnasale
+  ctx.quadraticCurveTo(...tc(175, 45), ...tc(171, 43)); // columella / subnasale
+
+  // Philtrum: gentle concave dip then lip protrudes
+  ctx.quadraticCurveTo(...tc(169, 38), ...tc(172, 33)); // philtrum / upper lip peak
+  ctx.quadraticCurveTo(...tc(173, 29), ...tc(171, 25)); // upper lip rolls back slightly
+
+  // Stomion and lower lip
+  ctx.quadraticCurveTo(...tc(170, 22), ...tc(170, 19)); // lower lip vermillion
+
+  // Labiomental fold (concavity between lower lip and chin)
+  ctx.quadraticCurveTo(...tc(168, 14), ...tc(167, 9));  // labiomental
+
+  // Chin (pogonion protrudes, then gnathion)
+  ctx.quadraticCurveTo(...tc(166, 4),  ...tc(164, 0));  // pogonion / gnathion
+
+  // Submental and neck
+  ctx.quadraticCurveTo(...tc(161, -5), ...tc(155, -10)); // submental to neck
+
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 2.5 * scale;
+  ctx.stroke();
+
+  // ── Nasal alar (wing of nose) ─────────────────────────────────────────────
+  // A separate bezier tracing the alar rim from the nasal tip, sweeping out
+  // around the nostril, and returning to the alar base near subnasale.
+  ctx.beginPath();
+  ctx.moveTo(...tc(176, 49));           // just below nasal tip
+  ctx.bezierCurveTo(
+    ...tc(178, 47),                     // alar rim swings outward
+    ...tc(175, 43),                     // alar base curves back
+    ...tc(171, 43)                      // alar base / subnasale
+  );
+  ctx.strokeStyle = 'rgba(110, 78, 54, 0.40)';
+  ctx.lineWidth = 1.8 * scale;
+  ctx.stroke();
+
+  // ── Nostril ───────────────────────────────────────────────────────────────
+  // Small filled ellipse inside the alar curve, tilted to suggest nostril opening.
+  const [ncx, ncy] = tc(174, 46);
+  ctx.beginPath();
+  ctx.ellipse(ncx, ncy, 3.2 * scale, 2.0 * scale, Math.PI * 0.18, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(90, 55, 35, 0.40)';
+  ctx.fill();
+
+  ctx.restore();
+}
 
 function drawNasalCavity(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
   // Nasal cavity polygon: above hard palate from x=55 to x=162, y=50..78
@@ -272,7 +363,6 @@ function drawMandible(
   scale: number
 ) {
   // Jaw rotates around TMJ pivot (52, 65) — posterior and superior (anatomically correct).
-  // Positive jaw_angle opens the mouth (rotates mandible downward).
   const pivotX = 52, pivotY = 65;
   const angleRad = (jawAngle * Math.PI) / 180;
 
@@ -287,7 +377,6 @@ function drawMandible(
     [44,  58],   // just below condyle (TMJ at 52,65)
   ];
 
-  // Rotate each point around TMJ
   const rotated = mandible.map(([x, y]) => rotatePt(x, y, pivotX, pivotY, -angleRad));
 
   ctx.beginPath();
@@ -297,7 +386,10 @@ function drawMandible(
     const [px, py] = toCanvas(rotated[i][0], rotated[i][1]);
     ctx.lineTo(px, py);
   }
-  ctx.strokeStyle = COLORS.outline;
+  ctx.closePath();
+  ctx.fillStyle = COLORS.mandible;
+  ctx.fill();
+  ctx.strokeStyle = COLORS.mandibleStroke;
   ctx.lineWidth = 1.5 * scale;
   ctx.stroke();
 }
@@ -311,9 +403,10 @@ function drawLowerTeeth(
   const pivotX = 52, pivotY = 65;
   const angleRad = (jawAngle * Math.PI) / 180;
 
+  // Lower incisors sit on the alveolar crest (~y=33) with tips at ~y=22.
   const teeth: [number, number][] = [
-    [148, 18], [152, 18], [157, 14], [158, 9],
-    [155, 5], [150, 4], [146, 6], [145, 12], [147, 17],
+    [146, 33], [152, 33], [157, 30], [159, 25],
+    [156, 21], [150, 20], [146, 22], [145, 27], [145, 33],
   ];
 
   const rotated = teeth.map(([x, y]) => rotatePt(x, y, pivotX, pivotY, -angleRad));
