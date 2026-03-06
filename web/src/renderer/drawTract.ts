@@ -14,7 +14,7 @@ const VTC_X_MIN = -22;
 const VTC_X_MAX = 185;
 const TRACT_WIDTH = VTC_X_MAX - VTC_X_MIN; // 207
 const TRACT_Y_MIN = -25;
-const TRACT_Y_RANGE = 107; // -25 → +82
+const TRACT_Y_RANGE = 140; // -25 → +115
 
 export interface Transform {
   toCanvas: (x: number, y: number) => [number, number];
@@ -331,16 +331,15 @@ function drawPosteriorNeck(ctx: CanvasRenderingContext2D, toCanvas: Transform['t
     ...tc(-13, 56),                    // suboccipital / C1-C2
   );
 
-  // Occiput → vertex (crown) — control points far above y=82 push the arc well
-  // above the canvas, producing a clearly domed skull silhouette.
+  // Occiput → vertex (crown) — rises to the top of the skull
   ctx.bezierCurveTo(
-    ...tc(-6,  80), ...tc(15,  120),
-    ...tc(75,  125),                   // vertex / crown (above canvas — clipped naturally)
+    ...tc(-5,  78), ...tc(30, 115),
+    ...tc(75,  110),                   // vertex / crown
   );
 
   // Crown → glabella — forehead slopes forward and downward
   ctx.bezierCurveTo(
-    ...tc(140, 124), ...tc(160, 100),
+    ...tc(120, 112), ...tc(158, 93),
     ...tc(162, 79),                    // glabella — joins the face profile
   );
 
