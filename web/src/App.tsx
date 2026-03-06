@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { VocalTractCanvas } from './components/VocalTractCanvas';
 import { TextInput } from './components/TextInput';
 import { TranscriptOverlay } from './components/TranscriptOverlay';
@@ -54,27 +54,25 @@ export default function App() {
     syncRef.current.onEnd();
   });
 
-  // When session becomes ready, start TTS
-  const readyRef = useRef(false);
-  useEffect(() => {
-    if (isReady && !readyRef.current && spokenText) {
-      readyRef.current = true;
-      const { voice, rate, pitch } = settingsRef.current;
-      setTimeout(() => {
-        ttsRef.current.speak(spokenText, voice ?? undefined, rate, pitch);
-      }, 50);
-    }
-    if (!isReady) {
-      readyRef.current = false;
-    }
-  }, [isReady, spokenText]);
-
   const handleSpeak = useCallback(
     async (text: string) => {
       ttsRef.current.cancel();
       setInputText(text);
       setSpokenText(text);
-      await createSession(text, settingsRef.current.rate);
+
+      // speak() must be called directly in the user-gesture context.
+      // Mobile browsers (iOS Safari, Chrome Android) block speech that is
+      // triggered asynchronously from a useEffect or setTimeout.
+      const { voice, rate, pitch } = settingsRef.current;
+      ttsRef.current.speak(text, voice ?? undefined, rate, pitch);
+
+      // Precompute WASM session in parallel. Animation syncs once ready.
+      // Cancel TTS if precompute fails.
+      try {
+        await createSession(text, settingsRef.current.rate);
+      } catch {
+        ttsRef.current.cancel();
+      }
     },
     [createSession]
   );
