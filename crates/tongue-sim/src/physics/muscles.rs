@@ -21,9 +21,9 @@ fn muscle_actions() -> [MuscleAction; 9] {
         // 3: HG — pulls body downward and backward
         MuscleAction { target: Vec2::new(25.0, 12.0), max_force: 5000.0 },
         // 4: PG — elevates dorsum toward soft palate
-        MuscleAction { target: Vec2::new(70.0, 50.0), max_force: 5000.0 },
+        MuscleAction { target: Vec2::new(70.0, 52.0), max_force: 7000.0 },
         // 5: SL — curls tip upward (toward alveolar ridge)
-        MuscleAction { target: Vec2::new(145.0, 46.0), max_force: 4000.0 },
+        MuscleAction { target: Vec2::new(145.0, 44.0), max_force: 6500.0 },
         // 6: IL — curls tip downward
         MuscleAction { target: Vec2::new(130.0, 18.0), max_force: 3000.0 },
         // 7: T — narrows tongue (in 2D: raises midline slightly)

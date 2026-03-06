@@ -4,7 +4,7 @@ use crate::physics::mesh::{TongueMesh, DistanceConstraint, AreaConstraint, quad_
 use crate::physics::muscles;
 use crate::physics::collisions;
 
-const RAYLEIGH_MASS: f64 = 20.0;
+const RAYLEIGH_MASS: f64 = 12.0;
 const PBD_ITERATIONS: usize = 10;
 
 /// Step the tongue mesh forward by dt seconds using PBD.
