@@ -55,19 +55,9 @@ export function SettingsPanel({ settings, voices, onChange, onClose }: Props) {
 
           {/* Toggles */}
           <ToggleRow
-            label="Show airflow"
-            value={settings.showAirflow}
-            onChange={(v) => onChange({ showAirflow: v })}
-          />
-          <ToggleRow
             label="Show IPA labels"
             value={settings.showLabels}
             onChange={(v) => onChange({ showLabels: v })}
-          />
-          <ToggleRow
-            label="Show mesh debug"
-            value={settings.showMeshDebug}
-            onChange={(v) => onChange({ showMeshDebug: v })}
           />
         </div>
       </div>

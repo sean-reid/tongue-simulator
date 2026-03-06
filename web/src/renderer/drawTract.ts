@@ -45,25 +45,19 @@ export function drawVocalTract(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // 1. Nasal cavity air space
-  drawNasalCavity(ctx, toCanvas, scale);
-
-  // 2. Pharyngeal wall
+  // 1. Pharyngeal wall
   drawPharyngealWall(ctx, toCanvas, scale);
 
-  // 3. Trachea / subglottal
-  drawTrachea(ctx, toCanvas, scale);
-
-  // 4. Hard palate
+  // 2. Hard palate
   drawHardPalate(ctx, toCanvas, scale);
 
-  // 5. Alveolar ridge
+  // 3. Alveolar ridge
   drawAlveolarRidge(ctx, toCanvas, scale);
 
-  // 6. Upper teeth
+  // 4. Upper teeth
   drawUpperTeeth(ctx, toCanvas, scale);
 
-  // 7. Face profile outline (drawn last so it sits on top of other structures)
+  // 5. Face profile outline
   drawFaceProfile(ctx, toCanvas, scale);
 
   ctx.restore();
@@ -109,9 +103,6 @@ export function drawRigidBodies(
   // Lips
   drawLips(ctx, state, toCanvas, scale);
 
-  // Larynx / epiglottis
-  drawLarynx(ctx, state, toCanvas, scale);
-
   ctx.restore();
 }
 
@@ -121,22 +112,40 @@ export function drawVoicingIndicator(
   cw: number,
   ch: number
 ) {
-  if (state.voicing < 0.05) return;
-
   const { toCanvas, scale } = buildTransform(cw, ch);
-  const [gx, gy] = toCanvas(15, 3);
-  const r = 8 * scale;
 
-  const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
-  const alpha = state.voicing * 0.4;
-  grad.addColorStop(0, `rgba(255,200,100,${alpha})`);
-  grad.addColorStop(1, 'rgba(255,200,100,0)');
+  // Draw vocal folds as two angled lines forming a V at the glottis.
+  // The gap between them reflects glottal_aperture; color reflects voicing.
+  const aperture = state.glottal_aperture; // 0=closed, 1=open
+  const voiced = state.voicing > 0.15;
+
+  // Glottis center in VTC coords
+  const [gx, gy] = toCanvas(15, 3);
+  const foldLen = 5 * scale;
+  const gap = aperture * 4 * scale; // half-gap between fold tips
+
+  // Left fold (from base upward-right to tip)
+  const lbx = gx - 1 * scale, lby = gy + foldLen * 0.5;
+  const ltx = gx - gap,       lty = gy - foldLen * 0.5;
+  // Right fold (mirror)
+  const rbx = gx + 1 * scale, rby = lby;
+  const rtx = gx + gap,       rty = lty;
 
   ctx.save();
-  ctx.fillStyle = grad;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2 * scale;
+  ctx.strokeStyle = voiced ? '#D4860A' : 'rgba(120,100,80,0.6)';
+
   ctx.beginPath();
-  ctx.arc(gx, gy, r, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(lbx, lby);
+  ctx.lineTo(ltx, lty);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(rbx, rby);
+  ctx.lineTo(rtx, rty);
+  ctx.stroke();
+
   ctx.restore();
 }
 
@@ -231,29 +240,62 @@ function drawFaceProfile(ctx: CanvasRenderingContext2D, toCanvas: Transform['toC
   ctx.fillStyle = 'rgba(90, 55, 35, 0.40)';
   ctx.fill();
 
+  // ── Eye ──────────────────────────────────────────────────────────────────
+  drawEye(ctx, toCanvas, scale);
+
   ctx.restore();
 }
 
-function drawNasalCavity(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
-  // Nasal cavity polygon: above hard palate from x=55 to x=162, y=50..78
-  const pts: [number, number][] = [
-    [55, 50], [62, 52], [90, 54], [120, 53], [148, 48],
-    [162, 50], [162, 78], [55, 78],
-  ];
+function drawEye(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Eye socket / orbit — sits recessed in the face, slightly posterior to the forehead curve.
+  // In VTC x-coords, the eye is roughly at x=161, y=70 (between glabella and nasion).
+  const [ecx, ecy] = toCanvas(160, 70);
+  const ew = 8 * scale;  // wider — anatomically the eye spans ~30mm
+  const eh = 5 * scale;  // taller — orbital height
 
+  // Blink: closed for ~150ms every ~4 seconds
+  const t = performance.now() % 4200;
+  const blinking = t < 150;
+
+  ctx.save();
+
+  // Eyelid shadow / orbit outline — slightly larger ellipse in dark tone
   ctx.beginPath();
-  const [sx, sy] = toCanvas(pts[0][0], pts[0][1]);
-  ctx.moveTo(sx, sy);
-  for (let i = 1; i < pts.length; i++) {
-    const [px, py] = toCanvas(pts[i][0], pts[i][1]);
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fillStyle = COLORS.nasalCavityFill;
+  ctx.ellipse(ecx, ecy, ew + 1.5 * scale, eh + 1 * scale, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(140, 100, 75, 0.25)';
   ctx.fill();
-  ctx.strokeStyle = COLORS.nasalCavityStroke;
-  ctx.lineWidth = 0.8 * scale;
+
+  // Sclera
+  ctx.beginPath();
+  ctx.ellipse(ecx, ecy, ew, blinking ? 0.8 * scale : eh, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(245, 242, 235, 0.95)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(90, 60, 40, 0.55)';
+  ctx.lineWidth = 1 * scale;
   ctx.stroke();
+
+  if (!blinking) {
+    // Iris — large, fills much of the eye
+    const ir = 3.8 * scale;
+    ctx.beginPath();
+    ctx.arc(ecx, ecy, ir, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(85, 115, 75, 0.9)';
+    ctx.fill();
+
+    // Pupil
+    ctx.beginPath();
+    ctx.arc(ecx, ecy, 2 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 10, 8, 0.95)';
+    ctx.fill();
+
+    // Specular glint
+    ctx.beginPath();
+    ctx.arc(ecx - 1.2 * scale, ecy - 1.2 * scale, 0.7 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function drawPharyngealWall(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
@@ -269,28 +311,12 @@ function drawPharyngealWall(ctx: CanvasRenderingContext2D, toCanvas: Transform['
     ctx.lineTo(px, py);
   }
   ctx.strokeStyle = COLORS.pharyngealWall;
-  ctx.lineWidth = 2.5 * scale;
-  ctx.stroke();
-}
-
-function drawTrachea(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
-  const [x1, y1] = toCanvas(12, 3);
-  const [x2, y2] = toCanvas(18, 3);
-  const [x3, y3] = toCanvas(18, -20);
-  const [x4, y4] = toCanvas(12, -20);
-
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x4, y4);
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x3, y3);
-  ctx.strokeStyle = COLORS.trachea;
   ctx.lineWidth = 1.5 * scale;
   ctx.stroke();
 }
 
 function drawHardPalate(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
-  // Cubic Bezier: (60,50) → (90,52) → (120,50) → (148,42)
+  // Cubic Bezier: (60,50) → (90,52) → (120,50) → (148,42) — single stroke line
   const p0: [number, number] = [60, 50];
   const p1: [number, number] = [90, 52];
   const p2: [number, number] = [120, 50];
@@ -305,16 +331,8 @@ function drawHardPalate(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCa
     const [px, py] = toCanvas(pts[i][0], pts[i][1]);
     ctx.lineTo(px, py);
   }
-  // Fill from the palate upward (create a thick band)
-  const pts2 = [...pts].reverse().map(([x, y]) => toCanvas(x, y + 5));
-  for (const [px, py] of pts2) {
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fillStyle = COLORS.palate;
-  ctx.fill();
   ctx.strokeStyle = COLORS.palateStroke;
-  ctx.lineWidth = 1.5 * scale;
+  ctx.lineWidth = 2.5 * scale;
   ctx.stroke();
 }
 
@@ -336,24 +354,37 @@ function drawAlveolarRidge(ctx: CanvasRenderingContext2D, toCanvas: Transform['t
 }
 
 function drawUpperTeeth(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
-  const pts: [number, number][] = [
-    [148, 42], [152, 43], [158, 38], [160, 32],
-    [158, 28], [153, 26], [149, 28], [147, 32], [148, 38],
+  // Upper incisors: two tooth shapes visible in side profile.
+  // In midsagittal view, we see the profile of the incisors —
+  // flat top attached to alveolar ridge, rounded bottom edge.
+  const teeth: Array<{ x1: number; x2: number; top: number; bot: number }> = [
+    { x1: 149, x2: 155, top: 42, bot: 27 }, // central incisor (broader)
+    { x1: 155, x2: 160, top: 40, bot: 28 }, // lateral incisor
   ];
 
-  ctx.beginPath();
-  const [sx, sy] = toCanvas(pts[0][0], pts[0][1]);
-  ctx.moveTo(sx, sy);
-  for (let i = 1; i < pts.length; i++) {
-    const [px, py] = toCanvas(pts[i][0], pts[i][1]);
-    ctx.lineTo(px, py);
+  for (const t of teeth) {
+    const [lx, ty] = toCanvas(t.x1, t.top);
+    const [rx, _] = toCanvas(t.x2, t.top);
+    const [, by] = toCanvas(t.x1, t.bot);
+    const w = rx - lx;
+    const h = by - ty;
+    const r = Math.min(Math.abs(w), Math.abs(h)) * 0.25;
+
+    ctx.beginPath();
+    ctx.moveTo(lx, ty);
+    ctx.lineTo(rx, ty);
+    ctx.lineTo(rx, by - r);
+    ctx.quadraticCurveTo(rx, by, rx - r, by);
+    ctx.lineTo(lx + r, by);
+    ctx.quadraticCurveTo(lx, by, lx, by - r);
+    ctx.lineTo(lx, ty);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.teeth;
+    ctx.fill();
+    ctx.strokeStyle = COLORS.teethStroke;
+    ctx.lineWidth = 0.8 * scale;
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.fillStyle = COLORS.teeth;
-  ctx.fill();
-  ctx.strokeStyle = COLORS.teethStroke;
-  ctx.lineWidth = 1 * scale;
-  ctx.stroke();
 }
 
 function drawMandible(
@@ -362,35 +393,42 @@ function drawMandible(
   toCanvas: Transform['toCanvas'],
   scale: number
 ) {
-  // Jaw rotates around TMJ pivot (52, 65) — posterior and superior (anatomically correct).
   const pivotX = 52, pivotY = 65;
   const angleRad = (jawAngle * Math.PI) / 180;
 
-  const mandible: [number, number][] = [
-    [145, 35],   // lower alveolar crest
-    [138, 18],   // symphysis menti (chin)
-    [118, -6],   // inferior border, anterior body
-    [88,  -8],   // inferior border, mid-body
-    [60,  -4],   // angle of jaw (gonion)
-    [50,  15],   // ascending ramus, lower
-    [46,  38],   // ascending ramus, mid
-    [44,  58],   // just below condyle (TMJ at 52,65)
+  // Key jaw landmarks — rotated around TMJ pivot
+  const pts: [number, number][] = [
+    [145, 33],   // alveolar crest (tooth-bearing region)
+    [132, 12],   // chin / symphysis
+    [100, -7],   // inferior border
+    [65,  -4],   // gonion / jaw angle
+    [48,  20],   // ascending ramus
+    [44,  52],   // just below condyle
   ];
 
-  const rotated = mandible.map(([x, y]) => rotatePt(x, y, pivotX, pivotY, -angleRad));
+  const rot = pts.map(([x, y]) => rotatePt(x, y, pivotX, pivotY, -angleRad));
+  const canvas = rot.map(([x, y]) => toCanvas(x, y));
 
+  // Draw as a smooth open spline (Catmull-Rom style via bezier approximation)
   ctx.beginPath();
-  const start = toCanvas(rotated[0][0], rotated[0][1]);
-  ctx.moveTo(start[0], start[1]);
-  for (let i = 1; i < rotated.length; i++) {
-    const [px, py] = toCanvas(rotated[i][0], rotated[i][1]);
-    ctx.lineTo(px, py);
+  ctx.moveTo(canvas[0][0], canvas[0][1]);
+
+  for (let i = 0; i < canvas.length - 1; i++) {
+    const p0 = canvas[Math.max(0, i - 1)];
+    const p1 = canvas[i];
+    const p2 = canvas[i + 1];
+    const p3 = canvas[Math.min(canvas.length - 1, i + 2)];
+
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2[0], p2[1]);
   }
-  ctx.closePath();
-  ctx.fillStyle = COLORS.mandible;
-  ctx.fill();
+
   ctx.strokeStyle = COLORS.mandibleStroke;
-  ctx.lineWidth = 1.5 * scale;
+  ctx.lineWidth = 2.5 * scale;
   ctx.stroke();
 }
 
@@ -403,27 +441,42 @@ function drawLowerTeeth(
   const pivotX = 52, pivotY = 65;
   const angleRad = (jawAngle * Math.PI) / 180;
 
-  // Lower incisors sit on the alveolar crest (~y=33) with tips at ~y=22.
-  const teeth: [number, number][] = [
-    [146, 33], [152, 33], [157, 30], [159, 25],
-    [156, 21], [150, 20], [146, 22], [145, 27], [145, 33],
+  // Lower incisors — two tooth shapes, rounded top edge, flat root.
+  const lowerTeeth = [
+    { x1: 149, x2: 155, top: 33, bot: 20 },
+    { x1: 155, x2: 160, top: 31, bot: 21 },
   ];
 
-  const rotated = teeth.map(([x, y]) => rotatePt(x, y, pivotX, pivotY, -angleRad));
+  for (const t of lowerTeeth) {
+    // Rotate all four corners
+    const tl = rotatePt(t.x1, t.top, pivotX, pivotY, -angleRad);
+    const tr = rotatePt(t.x2, t.top, pivotX, pivotY, -angleRad);
+    const bl = rotatePt(t.x1, t.bot, pivotX, pivotY, -angleRad);
+    const br = rotatePt(t.x2, t.bot, pivotX, pivotY, -angleRad);
 
-  ctx.beginPath();
-  const start = toCanvas(rotated[0][0], rotated[0][1]);
-  ctx.moveTo(start[0], start[1]);
-  for (let i = 1; i < rotated.length; i++) {
-    const [px, py] = toCanvas(rotated[i][0], rotated[i][1]);
-    ctx.lineTo(px, py);
+    const [lx, ty] = toCanvas(bl[0], bl[1]); // bottom-left (root)
+    const [rx, _by] = toCanvas(br[0], br[1]); // bottom-right
+    const [, topY] = toCanvas(tl[0], tl[1]); // top (tip of tooth)
+    const w = rx - lx;
+    const h = Math.abs(topY - _by);
+    const r = Math.min(Math.abs(w), h) * 0.25;
+
+    // In canvas: lower y = higher on screen. Tooth tip is at topY (smaller canvas y = higher)
+    ctx.beginPath();
+    ctx.moveTo(lx, _by);
+    ctx.lineTo(rx, _by);
+    ctx.lineTo(rx, topY + r);
+    ctx.quadraticCurveTo(rx, topY, rx - r, topY);
+    ctx.lineTo(lx + r, topY);
+    ctx.quadraticCurveTo(lx, topY, lx, topY + r);
+    ctx.lineTo(lx, _by);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.teeth;
+    ctx.fill();
+    ctx.strokeStyle = COLORS.teethStroke;
+    ctx.lineWidth = 0.8 * scale;
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.fillStyle = COLORS.teeth;
-  ctx.fill();
-  ctx.strokeStyle = COLORS.teethStroke;
-  ctx.lineWidth = scale;
-  ctx.stroke();
 }
 
 function drawVelum(
@@ -456,68 +509,47 @@ function drawLips(
   toCanvas: Transform['toCanvas'],
   scale: number
 ) {
-  // Upper lip
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Upper lip — thick rounded stroke showing lip profile from the side
   if (state.upper_lip.length >= 2) {
+    const ul = state.upper_lip;
     ctx.beginPath();
-    const [sx, sy] = toCanvas(state.upper_lip[0][0], state.upper_lip[0][1]);
-    ctx.moveTo(sx, sy);
-    for (let i = 1; i < state.upper_lip.length; i++) {
-      const [px, py] = toCanvas(state.upper_lip[i][0], state.upper_lip[i][1]);
+    const [s0x, s0y] = toCanvas(ul[0][0], ul[0][1]);
+    ctx.moveTo(s0x, s0y);
+    for (let i = 1; i < ul.length; i++) {
+      const [px, py] = toCanvas(ul[i][0], ul[i][1]);
       ctx.lineTo(px, py);
     }
     ctx.strokeStyle = COLORS.lipStroke;
-    ctx.lineWidth = 4 * scale;
+    ctx.lineWidth = 8 * scale;
     ctx.stroke();
     ctx.strokeStyle = COLORS.upperLip;
-    ctx.lineWidth = 3 * scale;
+    ctx.lineWidth = 6 * scale;
     ctx.stroke();
   }
 
   // Lower lip
   if (state.lower_lip.length >= 2) {
+    const ll = state.lower_lip;
     ctx.beginPath();
-    const [sx, sy] = toCanvas(state.lower_lip[0][0], state.lower_lip[0][1]);
-    ctx.moveTo(sx, sy);
-    for (let i = 1; i < state.lower_lip.length; i++) {
-      const [px, py] = toCanvas(state.lower_lip[i][0], state.lower_lip[i][1]);
+    const [l0x, l0y] = toCanvas(ll[0][0], ll[0][1]);
+    ctx.moveTo(l0x, l0y);
+    for (let i = 1; i < ll.length; i++) {
+      const [px, py] = toCanvas(ll[i][0], ll[i][1]);
       ctx.lineTo(px, py);
     }
     ctx.strokeStyle = COLORS.lipStroke;
-    ctx.lineWidth = 4 * scale;
+    ctx.lineWidth = 8 * scale;
     ctx.stroke();
     ctx.strokeStyle = COLORS.lowerLip;
-    ctx.lineWidth = 3 * scale;
+    ctx.lineWidth = 6 * scale;
     ctx.stroke();
   }
-}
 
-function drawLarynx(
-  ctx: CanvasRenderingContext2D,
-  state: RenderState,
-  toCanvas: Transform['toCanvas'],
-  scale: number
-) {
-  // Draw epiglottis as a short arc from (20, 22)
-  const [ex, ey] = toCanvas(20, 22);
-  const [lx, ly] = toCanvas(15, 8);
-
-  ctx.beginPath();
-  ctx.moveTo(lx, ly);
-  ctx.quadraticCurveTo(ex - 2 * scale, ey - 3 * scale, ex, ey);
-  ctx.strokeStyle = 'rgba(180,140,120,0.8)';
-  ctx.lineWidth = 2 * scale;
-  ctx.stroke();
-
-  // Glottis mark
-  const glottalY = 3 + state.glottal_aperture * 2;
-  const [gx1, gy1] = toCanvas(13, glottalY + 1);
-  const [gx2, gy2] = toCanvas(17, glottalY - 1);
-  ctx.beginPath();
-  ctx.moveTo(gx1, gy1);
-  ctx.lineTo(gx2, gy2);
-  ctx.strokeStyle = state.voicing > 0.1 ? '#ffcc44' : '#aaa';
-  ctx.lineWidth = 2 * scale;
-  ctx.stroke();
+  ctx.restore();
 }
 
 function rotatePt(

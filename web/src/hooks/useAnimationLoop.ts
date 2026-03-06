@@ -2,7 +2,6 @@ import { RefObject, useEffect, useRef } from 'react';
 import type { RenderState, Settings } from '../types/simulation';
 import { drawVocalTract, drawMandibleBone, drawRigidBodies, drawVoicingIndicator, drawIPALabel } from '../renderer/drawTract';
 import { drawTongue } from '../renderer/drawTongue';
-import { drawAirflow } from '../renderer/drawAirflow';
 
 interface AnimationLoopOptions {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -60,15 +59,9 @@ export function useAnimationLoop({
         drawMandibleBone(ctx, state.jaw_angle, canvas.width, canvas.height); // behind tongue
         drawTongue(ctx, state, canvas.width, canvas.height);                 // tongue on top
         drawRigidBodies(ctx, state, canvas.width, canvas.height);            // teeth/velum/lips in front
-        if (settings.showAirflow) {
-          drawAirflow(ctx, state, canvas.width, canvas.height);
-        }
         drawVoicingIndicator(ctx, state, canvas.width, canvas.height);
         if (settings.showLabels && state.current_phoneme_ipa) {
           drawIPALabel(ctx, state.current_phoneme_ipa, canvas.width, canvas.height);
-        }
-        if (settings.showMeshDebug) {
-          drawMeshDebug(ctx, state, canvas.width, canvas.height);
         }
       } else {
         // Draw resting anatomy even when no session is loaded
@@ -83,45 +76,3 @@ export function useAnimationLoop({
   }, [canvasRef, getRenderState, getCurrentSimTimeMs, settings]);
 }
 
-function drawMeshDebug(
-  ctx: CanvasRenderingContext2D,
-  state: RenderState,
-  w: number,
-  h: number
-) {
-  const { toCanvas } = getTransform(w, h);
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,200,100,0.5)';
-  ctx.lineWidth = 0.5;
-
-  for (const pt of state.tongue_dorsal) {
-    const [cx, cy] = toCanvas(pt[0], pt[1]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  for (const pt of state.tongue_ventral) {
-    const [cx, cy] = toCanvas(pt[0], pt[1]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-function getTransform(w: number, h: number) {
-  const scaleX = w / 185;
-  const scaleY = h / 100;
-  const scale = Math.min(scaleX, scaleY);
-  const offsetX = (w - 185 * scale) / 2;
-  const offsetY = (h - 100 * scale) / 2;
-
-  return {
-    toCanvas: (x: number, y: number): [number, number] => [
-      offsetX + x * scale,
-      h - offsetY - y * scale,
-    ],
-  };
-}

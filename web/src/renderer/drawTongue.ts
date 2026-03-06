@@ -44,27 +44,9 @@ export function drawTongue(
     ctx.closePath();
   }
 
-  // Gradient fill: anatomical tongue pink — lighter midline, darker edges
-  const midX = (dorsal[7]?.[0] ?? cw / 2);
-  const midY = (dorsal[7]?.[1] ?? ch / 2);
-  const tongueRadius = 70 * scale;
-  const grad = ctx.createRadialGradient(midX, midY - tongueRadius * 0.15, 0, midX, midY, tongueRadius);
-  grad.addColorStop(0,   '#D97070');   // bright centre
-  grad.addColorStop(0.5, '#C05858');   // mid
-  grad.addColorStop(1,   '#8F3838');   // dark edge
-  ctx.fillStyle = grad;
+  // Flat fill — no gradient
+  ctx.fillStyle = COLORS.tongue;
   ctx.fill();
-
-  // Subtle sheen highlight along dorsal midline
-  if (smoothDorsal.length > 4) {
-    const hi = smoothDorsal.slice(2, smoothDorsal.length - 2);
-    ctx.beginPath();
-    ctx.moveTo(hi[0][0], hi[0][1]);
-    for (let i = 1; i < hi.length; i++) ctx.lineTo(hi[i][0], hi[i][1]);
-    ctx.strokeStyle = 'rgba(255,180,180,0.25)';
-    ctx.lineWidth = 4 * scale;
-    ctx.stroke();
-  }
 
   // Dorsal outline
   ctx.beginPath();

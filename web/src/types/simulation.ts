@@ -11,19 +11,10 @@ export interface RenderState {
   hyoid_y: number;
   glottal_aperture: number;
   voicing: number;
-  particles: ParticleData[];
   current_phoneme_ipa: string;
   current_phoneme_index: number;
   is_turbulent: boolean;
   min_area: number;
-}
-
-export interface ParticleData {
-  x: number;
-  y: number;
-  velocity_magnitude: number;
-  turbulence: number;
-  opacity: number;
 }
 
 export interface TimedPhoneme {
@@ -56,9 +47,7 @@ export interface SyncState {
 }
 
 export interface Settings {
-  showAirflow: boolean;
   showLabels: boolean;
-  showMeshDebug: boolean;
   pitch: number;
   voice: SpeechSynthesisVoice | null;
   rate: number;

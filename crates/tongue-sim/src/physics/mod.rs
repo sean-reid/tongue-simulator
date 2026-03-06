@@ -6,14 +6,11 @@ pub mod rigid_bodies;
 
 use crate::anatomy::{AnatomyConfig, Vec2};
 use crate::phoneme::ArticulatoryState;
-use crate::airflow;
 
 pub struct PhysicsEngine {
     pub mesh: mesh::TongueMesh,
     pub rigid: rigid_bodies::RigidBodies,
     pub anatomy: AnatomyConfig,
-    pub particles: airflow::particles::ParticleSystem,
-    pub area_function: airflow::AreaFunction,
 }
 
 impl PhysicsEngine {
@@ -22,29 +19,13 @@ impl PhysicsEngine {
             mesh: mesh::TongueMesh::new(anatomy),
             rigid: rigid_bodies::RigidBodies::new(anatomy),
             anatomy: anatomy.clone(),
-            particles: airflow::particles::ParticleSystem::new(),
-            area_function: airflow::AreaFunction::default(),
         }
     }
 
     /// Advance the simulation by one fixed timestep.
     pub fn step(&mut self, target: &ArticulatoryState, dt: f64) {
-        // Step tongue mesh (PBD)
         pbd::step_mesh(&mut self.mesh, target, &self.anatomy, dt);
-
-        // Step rigid bodies
         self.rigid.step(target, dt);
-
-        // Compute area function
-        self.area_function = airflow::compute_area_function(&self.mesh, &self.rigid, &self.anatomy);
-
-        // Update particles
-        self.particles.update(
-            &self.area_function,
-            target.glottal_aperture,
-            target.voicing,
-            dt,
-        );
     }
 }
 
@@ -61,7 +42,6 @@ pub struct Snapshot {
     pub voicing: f64,
     pub lip_protrusion: f64,
     pub lip_rounding: f64,
-    pub particles: Vec<airflow::particles::Particle>,
     pub phoneme_ipa: String,
     pub phoneme_index: usize,
 }

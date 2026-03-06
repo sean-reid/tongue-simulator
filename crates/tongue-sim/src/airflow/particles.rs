@@ -1,10 +1,12 @@
 use crate::anatomy::Vec2;
 use crate::airflow::AreaFunction;
 
-const MAX_PARTICLES: usize = 100;
-const PARTICLE_LIFETIME_MS: f64 = 500.0;
-const GLOTTIS_X: f64 = 15.0;
-const GLOTTIS_Y: f64 = 3.0;
+const MAX_PARTICLES: usize = 120;
+const PARTICLE_LIFETIME_MS: f64 = 900.0;
+// Emit from the oropharynx (oral cavity entry) — above the tongue body.
+// This avoids showing particles below the tongue in the subglottal region.
+const EMIT_X: f64 = 52.0;
+const EMIT_Y: f64 = 35.0;
 
 /// A single airflow particle.
 #[derive(Clone, Debug)]
@@ -41,7 +43,6 @@ impl ParticleSystem {
         dt: f64,
     ) {
         let dt_ms = dt * 1000.0;
-        let flow_v = area_fn.flow_velocity;
 
         // Emit new particles
         if glottal_aperture > 0.1 || voicing > 0.1 {
@@ -49,12 +50,12 @@ impl ParticleSystem {
             while self.emit_timer >= self.emit_interval_ms
                 && self.particles.len() < MAX_PARTICLES
             {
-                let rand_y = self.rand_f(-1.0, 1.0);
-                let init_vx = 40.0 + glottal_aperture * 120.0; // mm/s base forward speed
-                let rand_vy = self.rand_f(-0.5, 0.5);
+                let rand_y = self.rand_f(-1.5, 1.5);
+                let init_vx = 60.0 + glottal_aperture * 100.0;
+                let rand_vy = self.rand_f(-0.3, 0.3);
                 self.particles.push(Particle {
-                    position: Vec2::new(GLOTTIS_X, GLOTTIS_Y + rand_y),
-                    velocity: Vec2::new(init_vx, rand_vy * 8.0),
+                    position: Vec2::new(EMIT_X, EMIT_Y + rand_y),
+                    velocity: Vec2::new(init_vx, rand_vy * 4.0),
                     age_ms: 0.0,
                     turbulence: 0.0,
                     opacity: 1.0,
@@ -92,9 +93,11 @@ impl ParticleSystem {
             p.position.y += p.velocity.y * dt;
 
             p.turbulence = if area < 0.2 { 1.0 } else { (0.2 / area).min(1.0) };
-            p.opacity = (1.0 - p.age_ms / PARTICLE_LIFETIME_MS).max(0.0);
+            // Stay fully opaque for first 50% of life, then fade out
+            let fade_t = ((p.age_ms / PARTICLE_LIFETIME_MS - 0.5) / 0.5).max(0.0);
+            p.opacity = (1.0 - fade_t).max(0.0);
 
-            if p.age_ms >= PARTICLE_LIFETIME_MS || p.position.x > 165.0 {
+            if p.age_ms >= PARTICLE_LIFETIME_MS || p.position.x > 190.0 {
                 to_remove.push(i);
             }
         }
@@ -118,20 +121,42 @@ impl ParticleSystem {
 }
 
 /// Approximate vocal-tract centreline y-coordinate at a given x (mm).
-/// Pharynx (x=15→52): curves upward from y≈3 to y≈24.
-/// Oral cavity (x=52→165): roughly flat ~y=24, slight downward slope.
+/// Air flows ABOVE the tongue dorsum and BELOW the palate.
+///
+/// Key landmarks:
+///   Glottis       x=15,  y=3   (subglottal)
+///   Laryngopharynx x=35, y=16  (rising through pharynx)
+///   Oropharynx    x=52,  y=35  (bends from vertical to horizontal)
+///   Mid oral      x=80,  y=40  (between tongue body ~36 and palate ~48)
+///   Alveolar      x=130, y=38  (above tongue tip ~26, below alveolus ~42)
+///   Lip exit      x=162, y=28  (oral opening)
 fn tract_centerline_y(x: f64) -> f64 {
-    if x <= 15.0 { return 3.0; }
-    if x < 52.0 {
-        let t = (x - 15.0) / (52.0 - 15.0);
-        return 3.0 + t * 21.0;
+    // Piecewise linear through named landmarks
+    let stops: [(f64, f64); 7] = [
+        (15.0,  3.0),
+        (35.0, 16.0),
+        (52.0, 35.0),
+        (80.0, 40.0),
+        (130.0, 38.0),
+        (155.0, 30.0),
+        (165.0, 27.0),
+    ];
+
+    if x <= stops[0].0 { return stops[0].1; }
+    let last = stops.len() - 1;
+    if x >= stops[last].0 { return stops[last].1; }
+
+    for i in 0..last {
+        if x >= stops[i].0 && x < stops[i + 1].0 {
+            let t = (x - stops[i].0) / (stops[i + 1].0 - stops[i].0);
+            return stops[i].1 + t * (stops[i + 1].1 - stops[i].1);
+        }
     }
-    let t = (x - 52.0) / (165.0 - 52.0);
-    24.0 - t * 2.0
+    stops[last].1
 }
 
 fn area_at_x(area_fn: &AreaFunction, x: f64) -> f64 {
-    let dist = (x - GLOTTIS_X).max(0.0);
+    let dist = (x - 15.0).max(0.0);
     let total = area_fn.positions[43];
     if total < 1.0 { return 3.0; }
 

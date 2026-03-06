@@ -2,7 +2,6 @@ use wasm_bindgen::prelude::*;
 
 pub mod anatomy;
 pub mod api;
-pub mod airflow;
 pub mod g2p;
 pub mod gestures;
 pub mod phoneme;

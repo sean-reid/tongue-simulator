@@ -23,20 +23,10 @@ pub struct RenderState {
     pub hyoid_y: f64,
     pub glottal_aperture: f64,
     pub voicing: f64,
-    pub particles: Vec<ParticleData>,
     pub current_phoneme_ipa: String,
     pub current_phoneme_index: usize,
     pub is_turbulent: bool,
     pub min_area: f64,
-}
-
-#[derive(Clone, Serialize)]
-pub struct ParticleData {
-    pub x: f64,
-    pub y: f64,
-    pub velocity_magnitude: f64,
-    pub turbulence: f64,
-    pub opacity: f64,
 }
 
 /// Build a RenderState from current mesh/rigid state.
@@ -71,7 +61,6 @@ pub fn build_render_state(
         hyoid_y: rigid.hyoid_y,
         glottal_aperture: articulatory.glottal_aperture,
         voicing: articulatory.voicing,
-        particles: Vec::new(),
         current_phoneme_ipa: ipa.to_string(),
         current_phoneme_index: 0,
         is_turbulent: false,
@@ -100,14 +89,6 @@ fn snapshot_to_render(snap: &Snapshot, anatomy: &AnatomyConfig) -> RenderState {
     let lower_lip = rigid.lower_lip_points(anatomy);
     let velum_tip = rigid.velum_tip(anatomy);
 
-    let particles: Vec<ParticleData> = snap.particles.iter().map(|p| ParticleData {
-        x: p.position.x,
-        y: p.position.y,
-        velocity_magnitude: (p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y).sqrt(),
-        turbulence: p.turbulence,
-        opacity: p.opacity,
-    }).collect();
-
     RenderState {
         tongue_dorsal: snap.tongue_dorsal.iter().map(|p| [p.x, p.y]).collect(),
         tongue_ventral: snap.tongue_ventral.iter().map(|p| [p.x, p.y]).collect(),
@@ -119,7 +100,6 @@ fn snapshot_to_render(snap: &Snapshot, anatomy: &AnatomyConfig) -> RenderState {
         hyoid_y: snap.hyoid_y,
         glottal_aperture: snap.glottal_aperture,
         voicing: snap.voicing,
-        particles,
         current_phoneme_ipa: snap.phoneme_ipa.clone(),
         current_phoneme_index: snap.phoneme_index,
         is_turbulent: false,
@@ -194,7 +174,6 @@ impl SimulationSession {
                 voicing: articulatory.voicing,
                 lip_protrusion: engine.rigid.lip_protrusion,
                 lip_rounding: engine.rigid.lip_rounding,
-                particles: engine.particles.particles.clone(),
                 phoneme_ipa: ipa,
                 phoneme_index: pidx,
             };
@@ -314,15 +293,6 @@ fn interpolate_snapshots(a: &Snapshot, b: &Snapshot, t: f64, anatomy: &AnatomyCo
     let lower_lip = rigid.lower_lip_points(anatomy);
     let velum_tip = rigid.velum_tip(anatomy);
 
-    // Use particles from a (simpler approach)
-    let particles: Vec<ParticleData> = a.particles.iter().map(|p| ParticleData {
-        x: p.position.x,
-        y: p.position.y,
-        velocity_magnitude: (p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y).sqrt(),
-        turbulence: p.turbulence,
-        opacity: p.opacity,
-    }).collect();
-
     RenderState {
         tongue_dorsal: dorsal,
         tongue_ventral: ventral,
@@ -334,7 +304,6 @@ fn interpolate_snapshots(a: &Snapshot, b: &Snapshot, t: f64, anatomy: &AnatomyCo
         hyoid_y: hyoid,
         glottal_aperture: glottal,
         voicing,
-        particles,
         current_phoneme_ipa: a.phoneme_ipa.clone(),
         current_phoneme_index: a.phoneme_index,
         is_turbulent: false,

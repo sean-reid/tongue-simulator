@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { WordSyncEntry } from '../types/simulation';
-import { EMA, charIndexToWordIndex } from '../utils/timing';
+import { charIndexToWordIndex } from '../utils/timing';
 
 export interface SyncControllerState {
   isActive: boolean;
@@ -10,8 +10,14 @@ export interface SyncControllerState {
 }
 
 /**
- * Bridges TTS boundary events to simulation time.
- * Implements two-phase adaptive sync (§3.3 of the architecture).
+ * Anchor-based TTS→simulation sync.
+ *
+ * Each word boundary event gives an exact (wallTime, simTime) anchor.
+ * Between boundaries we interpolate forward at the locally measured rate.
+ * No EMA — adapts in a single word boundary.
+ *
+ * wordStretch = wallMs_elapsed / simMs_elapsed for the most recent word.
+ * Before the first boundary we use a conservative prior (1.6×).
  */
 export function useSyncController(wordSyncMap: WordSyncEntry[]) {
   const [state, setState] = useState<SyncControllerState>({
@@ -21,31 +27,21 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
     currentWord: '',
   });
 
-  // Wall-clock time at TTS start
-  const startWallTimeRef = useRef<number>(0);
-  // Last known actual word time (from boundary events)
-  const lastActualTimeRef = useRef<number>(0);
-  // Last known estimated word time
-  const lastEstimatedTimeRef = useRef<number>(0);
-  // Current time-stretch factor (actual / estimated)
-  const stretchRef = useRef<number>(1.0);
-  const stretchEmaRef = useRef(new EMA(1.0, 6));
-  // Whether we've received any boundary events (to detect fallback mode)
-  const gotBoundaryRef = useRef(false);
-  const fallbackModeRef = useRef(false);
-  const totalDurationRef = useRef<number>(0);
+  // Wall time (performance.now()) of the last boundary, or of onStart
+  const anchorWallRef = useRef(0);
+  // Sim time corresponding to that anchor
+  const anchorSimRef  = useRef(0);
+  // How many wall-ms correspond to 1 sim-ms (stretch > 1 = TTS is slower)
+  const wordStretchRef = useRef(1.6);
+  // Previous boundary for computing per-word stretch
+  const prevBoundaryRef = useRef<{ wallMs: number; simMs: number } | null>(null);
 
-  const onStart = useCallback((totalDurationMs: number) => {
-    startWallTimeRef.current = performance.now();
-    lastActualTimeRef.current = 0;
-    lastEstimatedTimeRef.current = 0;
-    // Pre-stretch at 1.8: TTS is typically ~1.5-2x slower than the phoneme model.
-    // EMA window=6 adapts quickly once boundary events arrive.
-    stretchRef.current = 1.8;
-    stretchEmaRef.current = new EMA(1.8, 6);
-    gotBoundaryRef.current = false;
-    fallbackModeRef.current = false;
-    totalDurationRef.current = totalDurationMs;
+  const onStart = useCallback((_totalDurationMs: number) => {
+    const now = performance.now();
+    anchorWallRef.current    = now;
+    anchorSimRef.current     = 0;
+    wordStretchRef.current   = 1.6;
+    prevBoundaryRef.current  = null;
 
     setState({
       isActive: true,
@@ -53,43 +49,36 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
       currentWordIndex: 0,
       currentWord: wordSyncMap[0]?.word ?? '',
     });
-
-    // Fallback mode if no boundary events received after 1200ms
-    setTimeout(() => {
-      if (!gotBoundaryRef.current) {
-        fallbackModeRef.current = true;
-      }
-    }, 1200);
   }, [wordSyncMap]);
 
   const onBoundary = useCallback(
-    (charIndex: number, elapsedTimeSec: number, _name: string) => {
-      gotBoundaryRef.current = true;
-      const actualMs = elapsedTimeSec * 1000;
+    (charIndex: number, _elapsedTimeSec: number, _name: string) => {
+      const wallMs   = performance.now();
+      const wordIdx  = charIndexToWordIndex(charIndex, wordSyncMap);
+      const entry    = wordSyncMap[wordIdx];
+      if (!entry) return;
 
-      // Find the matching word
-      const wordIdx = charIndexToWordIndex(charIndex, wordSyncMap);
-      const syncEntry = wordSyncMap[wordIdx];
+      const simMs = entry.estimated_time_ms;
 
-      if (syncEntry) {
-        const estimatedMs = syncEntry.estimated_time_ms;
-
-        // Compute local stretch factor for this boundary
-        if (estimatedMs > 0) {
-          const localStretch = actualMs / estimatedMs;
-          const smoothedStretch = stretchEmaRef.current.update(localStretch);
-          stretchRef.current = smoothedStretch;
+      // Measure the stretch from consecutive boundaries
+      if (prevBoundaryRef.current) {
+        const wallDelta = wallMs - prevBoundaryRef.current.wallMs;
+        const simDelta  = simMs  - prevBoundaryRef.current.simMs;
+        if (simDelta > 20 && wallDelta > 20) {
+          wordStretchRef.current = wallDelta / simDelta;
         }
-
-        lastActualTimeRef.current = actualMs;
-        lastEstimatedTimeRef.current = estimatedMs;
-
-        setState((s) => ({
-          ...s,
-          currentWordIndex: wordIdx,
-          currentWord: syncEntry.word,
-        }));
       }
+
+      // Snap anchor to this boundary
+      anchorWallRef.current   = wallMs;
+      anchorSimRef.current    = simMs;
+      prevBoundaryRef.current = { wallMs, simMs };
+
+      setState((s) => ({
+        ...s,
+        currentWordIndex: wordIdx,
+        currentWord: entry.word,
+      }));
     },
     [wordSyncMap]
   );
@@ -98,34 +87,13 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
     setState((s) => ({ ...s, isActive: false }));
   }, []);
 
-  /**
-   * Get the current simulation time in ms, called every animation frame.
-   * Uses wall-clock time relative to TTS start, corrected by adaptive warp.
-   */
   const getCurrentSimTimeMs = useCallback(
     (wallTimeMs: number): number => {
-      if (!state.isActive && state.currentSimTimeMs === 0) return 0;
-
-      const elapsed = wallTimeMs - startWallTimeRef.current;
-
-      if (fallbackModeRef.current) {
-        // Open-loop: use pre-stretched wall-clock time — TTS is typically slower
-        // than the phoneme model, so divide elapsed by the same stretch factor.
-        return elapsed / stretchRef.current;
-      }
-
-      // Adaptive warp: scale elapsed time by running stretch factor
-      // to produce a simulation time that tracks the TTS pacing.
-      const stretch = stretchRef.current;
-
-      // Piecewise: from last actual word time to present
-      const estimated =
-        lastEstimatedTimeRef.current +
-        (elapsed - lastActualTimeRef.current) / Math.max(stretch, 0.1);
-
-      return Math.max(0, estimated);
+      if (!state.isActive && anchorSimRef.current === 0) return 0;
+      const elapsed = wallTimeMs - anchorWallRef.current;
+      return anchorSimRef.current + elapsed / Math.max(wordStretchRef.current, 0.1);
     },
-    [state.isActive, state.currentSimTimeMs]
+    [state.isActive]
   );
 
   return { ...state, onStart, onBoundary, onEnd, getCurrentSimTimeMs };

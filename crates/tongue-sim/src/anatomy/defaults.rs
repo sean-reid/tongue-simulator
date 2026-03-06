@@ -144,6 +144,6 @@ pub fn default_anatomy() -> AnatomyConfig {
 
         // Velum hinge (posterior soft palate)
         velum_hinge: Vec2::new(52.0, 50.0),
-        velum_length: 22.0,
+        velum_length: 14.0,
     }
 }
