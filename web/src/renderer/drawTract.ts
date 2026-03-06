@@ -260,8 +260,8 @@ function drawEye(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'],
   // Eye socket / orbit — sits recessed in the face, slightly posterior to the forehead curve.
   // In VTC x-coords, the eye is roughly at x=161, y=70 (between glabella and nasion).
   const [ecx, ecy] = toCanvas(160, 70);
-  const ew = 8 * scale;  // wider — anatomically the eye spans ~30mm
-  const eh = 5 * scale;  // taller — orbital height
+  const ew = 12 * scale;  // wider — anatomically the eye spans ~30mm
+  const eh = 7.5 * scale;  // taller — orbital height
 
   // Blink: closed for ~150ms every ~4 seconds
   const t = performance.now() % 4200;
@@ -322,25 +322,24 @@ function drawPosteriorNeck(ctx: CanvasRenderingContext2D, toCanvas: Transform['t
   ctx.strokeStyle = 'rgba(110, 78, 54, 0.52)';
   ctx.lineWidth = 2.5 * scale;
 
+  // Circular arc approximation for the skull outline.
+  // The circle through neck(-5,-18), crown(75,110), glabella(162,79)
+  // has center ≈ (89,12), radius ≈ 99. Control points computed from
+  // the standard cubic bezier ≈ circular arc formula.
+
   ctx.beginPath();
-  ctx.moveTo(...tc(-5, -18));           // lower cervical spine / C7
+  ctx.moveTo(...tc(-5, -18));           // base of neck / C7
 
-  // Posterior cervical spine — curves slightly backward (lordosis)
+  // Neck → crown  (~100° arc, CW in VTC y-up coords)
   ctx.bezierCurveTo(
-    ...tc(-13, 8),  ...tc(-16, 34),
-    ...tc(-13, 56),                    // suboccipital / C1-C2
+    ...tc(-22, 42), ...tc(15, 101),
+    ...tc(75,  110),                   // crown / vertex
   );
 
-  // Occiput → vertex (crown) — rises to the top of the skull
+  // Crown → glabella  (~56° arc)
   ctx.bezierCurveTo(
-    ...tc(-5,  78), ...tc(30, 115),
-    ...tc(75,  110),                   // vertex / crown
-  );
-
-  // Crown → glabella — forehead slopes forward and downward
-  ctx.bezierCurveTo(
-    ...tc(120, 112), ...tc(158, 93),
-    ...tc(162, 79),                    // glabella — joins the face profile
+    ...tc(107, 115), ...tc(140, 103),
+    ...tc(162, 79),                    // glabella — joins face profile
   );
 
   ctx.stroke();

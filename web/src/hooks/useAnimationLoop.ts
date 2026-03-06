@@ -66,6 +66,7 @@ export function useAnimationLoop({
       } else {
         // Draw resting anatomy even when no session is loaded
         drawVocalTract(ctx, canvas.width, canvas.height);
+        drawMandibleBone(ctx, 0, canvas.width, canvas.height);
       }
 
       frameRef.current = requestAnimationFrame(loop);
