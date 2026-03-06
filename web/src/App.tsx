@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS: Settings = {
   showLabels: true,
   pitch: 1.0,
   voice: null,
-  rate: 1.0,
+  rate: 0.5,
 };
 
 export default function App() {

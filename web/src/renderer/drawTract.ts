@@ -5,13 +5,16 @@ import { sampleBezier } from '../utils/spline';
 import type { RenderState } from '../types/simulation';
 
 // Vocal tract coordinate space:
-//   x: 0 (posterior/glottis) → 185 (past lips)
-//   y: 0 (floor) → 100 (above nasal cavity)
-// Canvas maps this with flipped y.
+//   x: glottis ≈ 15, lips ≈ 165, posterior neck at x ≈ -20
+//   y: -25 (subglottal) → +82 (above nasal cavity)
+// We show x from -22 to +185 to include the posterior neck/skull.
+// Canvas maps this with flipped y (y increases upward in VTC, downward on canvas).
 
-const TRACT_WIDTH = 185;
-const TRACT_Y_MIN = -25;   // trachea extends below y=0
-const TRACT_Y_RANGE = 107; // total: from -25 to +82
+const VTC_X_MIN = -22;
+const VTC_X_MAX = 185;
+const TRACT_WIDTH = VTC_X_MAX - VTC_X_MIN; // 207
+const TRACT_Y_MIN = -25;
+const TRACT_Y_RANGE = 107; // -25 → +82
 
 export interface Transform {
   toCanvas: (x: number, y: number) => [number, number];
@@ -27,7 +30,7 @@ export function buildTransform(cw: number, ch: number): Transform {
   return {
     scale,
     toCanvas: (x: number, y: number): [number, number] => [
-      offsetX + x * scale,
+      offsetX + (x - VTC_X_MIN) * scale,
       ch - offsetY - (y - TRACT_Y_MIN) * scale,
     ],
   };
@@ -45,19 +48,30 @@ export function drawVocalTract(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // 1. Pharyngeal wall
+  // Draw back-to-front so posterior elements sit behind anterior ones
+
+  // 1. Posterior neck / skull outline (behind everything)
+  drawPosteriorNeck(ctx, toCanvas, scale);
+
+  // 2. Posterior pharyngeal wall + prevertebral tissue band
   drawPharyngealWall(ctx, toCanvas, scale);
 
-  // 2. Hard palate
+  // 3. Trachea — subglottal airway going downward
+  drawTrachea(ctx, toCanvas, scale);
+
+  // 4. Hard palate
   drawHardPalate(ctx, toCanvas, scale);
 
-  // 3. Alveolar ridge
+  // 5. Epiglottis
+  drawEpiglottis(ctx, toCanvas, scale);
+
+  // 6. Alveolar ridge
   drawAlveolarRidge(ctx, toCanvas, scale);
 
-  // 4. Upper teeth
+  // 7. Upper teeth
   drawUpperTeeth(ctx, toCanvas, scale);
 
-  // 5. Face profile outline
+  // 8. Face profile outline (on top so it overlaps correctly)
   drawFaceProfile(ctx, toCanvas, scale);
 
   ctx.restore();
@@ -119,31 +133,27 @@ export function drawVoicingIndicator(
   const aperture = state.glottal_aperture; // 0=closed, 1=open
   const voiced = state.voicing > 0.15;
 
-  // Glottis center in VTC coords
+  // Vocal folds drawn as a horizontal V inside the trachea column.
+  // The glottis sits at x=15 (between trachea walls at x=12 and x=18).
   const [gx, gy] = toCanvas(15, 3);
-  const foldLen = 5 * scale;
-  const gap = aperture * 4 * scale; // half-gap between fold tips
-
-  // Left fold (from base upward-right to tip)
-  const lbx = gx - 1 * scale, lby = gy + foldLen * 0.5;
-  const ltx = gx - gap,       lty = gy - foldLen * 0.5;
-  // Right fold (mirror)
-  const rbx = gx + 1 * scale, rby = lby;
-  const rtx = gx + gap,       rty = lty;
+  const halfSpan = 2.5 * scale;               // half the horizontal span of each fold
+  const depth    = aperture * 3.5 * scale;    // how open the glottis is (vertical gap)
 
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.lineWidth = 2 * scale;
-  ctx.strokeStyle = voiced ? '#D4860A' : 'rgba(120,100,80,0.6)';
+  ctx.lineWidth = 1.8 * scale;
+  ctx.strokeStyle = voiced ? '#C87010' : 'rgba(110, 85, 65, 0.55)';
 
+  // Upper fold: left wall → centre (open by depth)
   ctx.beginPath();
-  ctx.moveTo(lbx, lby);
-  ctx.lineTo(ltx, lty);
+  ctx.moveTo(gx - halfSpan, gy);
+  ctx.lineTo(gx, gy - depth);
   ctx.stroke();
 
+  // Lower fold: centre → right wall
   ctx.beginPath();
-  ctx.moveTo(rbx, rby);
-  ctx.lineTo(rtx, rty);
+  ctx.moveTo(gx, gy - depth);
+  ctx.lineTo(gx + halfSpan, gy);
   ctx.stroke();
 
   ctx.restore();
@@ -298,9 +308,51 @@ function drawEye(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'],
   ctx.restore();
 }
 
+function drawPosteriorNeck(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Complete head/neck outline on the posterior side.
+  // Draws from the lower cervical, up through the occiput, across the forehead crown,
+  // and ends at glabella (162, 79) — where the face profile begins.
+  // Together these two paths form a closed, recognisable human head silhouette.
+
+  const tc = (x: number, y: number): [number, number] => toCanvas(x, y);
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(110, 78, 54, 0.52)';
+  ctx.lineWidth = 2.5 * scale;
+
+  ctx.beginPath();
+  ctx.moveTo(...tc(-5, -18));           // lower cervical spine / C7
+
+  // Posterior cervical spine — curves slightly backward (lordosis)
+  ctx.bezierCurveTo(
+    ...tc(-13, 8),  ...tc(-16, 34),
+    ...tc(-13, 56),                    // suboccipital / C1-C2
+  );
+
+  // Occiput → vertex (crown) — control points far above y=82 push the arc well
+  // above the canvas, producing a clearly domed skull silhouette.
+  ctx.bezierCurveTo(
+    ...tc(-6,  80), ...tc(15,  120),
+    ...tc(75,  125),                   // vertex / crown (above canvas — clipped naturally)
+  );
+
+  // Crown → glabella — forehead slopes forward and downward
+  ctx.bezierCurveTo(
+    ...tc(140, 124), ...tc(160, 100),
+    ...tc(162, 79),                    // glabella — joins the face profile
+  );
+
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawPharyngealWall(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Anterior pharyngeal wall — the lumen-facing surface of the posterior pharynx.
+  // This is the wall the tongue faces across the pharyngeal airspace.
   const pts: [number, number][] = [
-    [15, -5], [15, 10], [14, 25], [13, 40], [14, 52], [18, 60],
+    [14, -5], [14, 12], [13, 28], [12, 42], [14, 55], [18, 62],
   ];
 
   ctx.beginPath();
@@ -311,8 +363,48 @@ function drawPharyngealWall(ctx: CanvasRenderingContext2D, toCanvas: Transform['
     ctx.lineTo(px, py);
   }
   ctx.strokeStyle = COLORS.pharyngealWall;
+  ctx.lineWidth = 2.5 * scale;
+  ctx.stroke();
+}
+
+function drawTrachea(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Subglottal trachea — two short parallel lines going downward from the glottis.
+  const [lx, ly] = toCanvas(12, 2);
+  const [rx, ry] = toCanvas(18, 2);
+  const [, by] = toCanvas(12, -22);
+
+  ctx.beginPath();
+  ctx.moveTo(lx, ly); ctx.lineTo(lx, by);
+  ctx.moveTo(rx, ry); ctx.lineTo(rx, by);
+  ctx.strokeStyle = 'rgba(140, 110, 90, 0.45)';
   ctx.lineWidth = 1.5 * scale;
   ctx.stroke();
+}
+
+function drawEpiglottis(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {
+  // Epiglottis — the leaf-shaped cartilage at the entrance to the larynx.
+  // Visible as a bent flap in the hypopharynx, roughly at x=20–30, y=18–32.
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(...toCanvas(20, 22));              // base (attached to thyroid cartilage)
+  ctx.bezierCurveTo(
+    ...toCanvas(22, 28), ...toCanvas(26, 32),  // sweeps up and forward
+    ...toCanvas(28, 30),                       // tip
+  );
+  ctx.bezierCurveTo(
+    ...toCanvas(28, 26), ...toCanvas(24, 22),  // curves back
+    ...toCanvas(22, 20),                       // inferior surface
+  );
+  ctx.strokeStyle = 'rgba(165, 120, 90, 0.75)';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(200, 155, 120, 0.35)';
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawHardPalate(ctx: CanvasRenderingContext2D, toCanvas: Transform['toCanvas'], scale: number) {

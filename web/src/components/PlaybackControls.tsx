@@ -49,9 +49,9 @@ export function PlaybackControls({
         </span>
         <input
           type="range"
-          min={0.5}
-          max={2.0}
-          step={0.1}
+          min={0.25}
+          max={1.5}
+          step={0.05}
           value={rate}
           onChange={(e) => onRateChange(parseFloat(e.target.value))}
           className="flex-1 accent-blue-600"
