@@ -10,11 +10,11 @@ import type { RenderState } from '../types/simulation';
 // We show x from -22 to +185 to include the posterior neck/skull.
 // Canvas maps this with flipped y (y increases upward in VTC, downward on canvas).
 
-const VTC_X_MIN = -22;
+const VTC_X_MIN = -30;
 const VTC_X_MAX = 185;
-const TRACT_WIDTH = VTC_X_MAX - VTC_X_MIN; // 207
+const TRACT_WIDTH = VTC_X_MAX - VTC_X_MIN; // 215
 const TRACT_Y_MIN = -25;
-const TRACT_Y_RANGE = 140; // -25 → +115
+const TRACT_Y_RANGE = 165; // -25 → +140
 
 export interface Transform {
   toCanvas: (x: number, y: number) => [number, number];
@@ -24,7 +24,7 @@ export interface Transform {
 export function buildTransform(cw: number, ch: number): Transform {
   const scaleX = cw / TRACT_WIDTH;
   const scaleY = ch / TRACT_Y_RANGE;
-  const scale = Math.min(scaleX, scaleY);
+  const scale = Math.min(scaleX, scaleY) * 0.92; // 4% margin each side
   const offsetX = (cw - TRACT_WIDTH * scale) / 2;
   const offsetY = (ch - TRACT_Y_RANGE * scale) / 2;
   return {
@@ -322,24 +322,33 @@ function drawPosteriorNeck(ctx: CanvasRenderingContext2D, toCanvas: Transform['t
   ctx.strokeStyle = 'rgba(110, 78, 54, 0.52)';
   ctx.lineWidth = 2.5 * scale;
 
-  // Circular arc approximation for the skull outline.
-  // The circle through neck(-5,-18), crown(75,110), glabella(162,79)
-  // has center ≈ (89,12), radius ≈ 99. Control points computed from
-  // the standard cubic bezier ≈ circular arc formula.
+  // Head silhouette: starts at glabella (where face profile begins), juts
+  // forward to the brow ridge, sweeps back and up over the crown, then
+  // descends to the posterior neck. Uses circle center ≈ (89,12), r ≈ 99.
+
+  // Circle fitting neck(-5,-18), crown(75,140), glabella(162,79):
+  //   center ≈ (72, 42), radius ≈ 97.5.
+  // Path: glabella → brow jut → sweep back/up to crown → down posterior neck.
 
   ctx.beginPath();
-  ctx.moveTo(...tc(-5, -18));           // base of neck / C7
+  ctx.moveTo(...tc(162, 79));           // glabella — exact same point as face profile start
 
-  // Neck → crown  (~100° arc, CW in VTC y-up coords)
+  // Glabella → crown  (~90° CCW arc, sweeps backward and upward)
   ctx.bezierCurveTo(
-    ...tc(-22, 42), ...tc(15, 101),
-    ...tc(75,  110),                   // crown / vertex
+    ...tc(155, 113), ...tc(115, 140),
+    ...tc(75,  140),                   // crown / vertex
   );
 
-  // Crown → glabella  (~56° arc)
+  // Crown → occiput  (~65° CCW arc)
   ctx.bezierCurveTo(
-    ...tc(107, 115), ...tc(140, 103),
-    ...tc(162, 79),                    // glabella — joins face profile
+    ...tc(37, 140), ...tc(2, 120),
+    ...tc(-15, 86),                    // occiput (most posterior skull point)
+  );
+
+  // Occiput → posterior neck  (~65° CCW arc)
+  ctx.bezierCurveTo(
+    ...tc(-32, 52), ...tc(-28, 12),
+    ...tc(-5,  -18),                   // base of posterior neck / C7
   );
 
   ctx.stroke();

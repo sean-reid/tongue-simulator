@@ -26,7 +26,7 @@ export function VocalTractCanvas({
       const parent = canvas.parentElement;
       if (!parent) return;
       const w = parent.clientWidth;
-      const h = Math.round(w * (3 / 4)); // 4:3 aspect ratio
+      const h = Math.round(w * (165 / 215)); // match coordinate space aspect ratio
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -50,7 +50,7 @@ export function VocalTractCanvas({
     <canvas
       ref={canvasRef}
       className="w-full block rounded bg-[#FAFAFA]"
-      style={{ aspectRatio: '4/3' }}
+      style={{ aspectRatio: '215/165' }}
     />
   );
 }

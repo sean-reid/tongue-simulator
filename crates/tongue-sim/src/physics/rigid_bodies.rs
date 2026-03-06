@@ -91,7 +91,7 @@ impl RigidBodies {
 
         base.iter().map(|p| {
             Vec2::new(
-                p.x + prot * 6.0 + round * 3.0,
+                p.x,
                 p.y + round * 2.0 - spread * 2.0,
             )
         }).collect()
@@ -101,12 +101,11 @@ impl RigidBodies {
     pub fn lower_lip_points(&self, anatomy: &AnatomyConfig) -> Vec<Vec2> {
         let base = &anatomy.lower_lip;
         let jaw_offset_y = self.jaw_angle * (-0.4); // jaw opening lowers lower lip
-        let prot = self.lip_protrusion;
         let round = self.lip_rounding;
 
         base.iter().map(|p| {
             Vec2::new(
-                p.x + prot * 6.0 + round * 3.0,
+                p.x,
                 p.y + jaw_offset_y + round * (-1.0),
             )
         }).collect()

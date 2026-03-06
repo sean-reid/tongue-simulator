@@ -124,13 +124,13 @@ pub fn default_anatomy() -> AnatomyConfig {
             angle_end: 1.2,
         },
 
-        // Upper lip (5 control points)
+        // Upper lip (5 control points) — mirrors lower lip arc, ~11 units higher
         upper_lip: vec![
-            Vec2::new(155.0, 36.0),
-            Vec2::new(158.0, 35.0),
-            Vec2::new(162.0, 32.0),
-            Vec2::new(164.0, 29.0),
-            Vec2::new(163.0, 27.0),
+            Vec2::new(155.0, 31.0),
+            Vec2::new(158.0, 32.0),
+            Vec2::new(162.0, 33.0),
+            Vec2::new(164.0, 32.0),
+            Vec2::new(163.0, 30.0),
         ],
 
         // Lower lip (5 control points)
