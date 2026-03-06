@@ -88,7 +88,7 @@ export default function App() {
     setSettings((s) => ({ ...s, ...partial }));
   }, []);
 
-  const isAnimating = syncController.isActive || tts.isSpeaking;
+  const isAnimating = (syncController.isActive || tts.isSpeaking) && !tts.isPaused;
 
   return (
     <div className="min-h-screen bg-white">
@@ -155,7 +155,7 @@ export default function App() {
           isPaused={tts.isPaused}
           rate={settings.rate}
           onPause={tts.pause}
-          onResume={tts.resume}
+          onResume={() => { syncController.onResume(); tts.resume(); }}
           onCancel={tts.cancel}
           onRateChange={(r) => handleSettingsChange({ rate: r })}
         />

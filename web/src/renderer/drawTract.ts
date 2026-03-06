@@ -497,7 +497,7 @@ function drawMandible(
 
   // Key jaw landmarks — rotated around TMJ pivot
   const pts: [number, number][] = [
-    [145, 33],   // alveolar crest (tooth-bearing region)
+    [152, 16],   // anterior end — below lower tooth bottoms (~y=20)
     [132, 12],   // chin / symphysis
     [100, -7],   // inferior border
     [65,  -4],   // gonion / jaw angle

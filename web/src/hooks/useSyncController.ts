@@ -87,6 +87,13 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
     setState((s) => ({ ...s, isActive: false }));
   }, []);
 
+  // Call when TTS resumes after a pause — re-anchors wall time so the elapsed
+  // calculation doesn't include the paused duration.
+  const onResume = useCallback(() => {
+    anchorWallRef.current = performance.now();
+    // anchorSimRef stays the same — we just reset the wall-clock reference
+  }, []);
+
   const getCurrentSimTimeMs = useCallback(
     (wallTimeMs: number): number => {
       if (!state.isActive && anchorSimRef.current === 0) return 0;
@@ -96,5 +103,5 @@ export function useSyncController(wordSyncMap: WordSyncEntry[]) {
     [state.isActive]
   );
 
-  return { ...state, onStart, onBoundary, onEnd, getCurrentSimTimeMs };
+  return { ...state, onStart, onBoundary, onEnd, onResume, getCurrentSimTimeMs };
 }
