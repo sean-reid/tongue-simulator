@@ -5,7 +5,7 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 
 export default defineConfig({
   plugins: [wasm(), topLevelAwait(), react()],
-  base: '/tongue-simulator/',
+  base: '/',
   build: {
     target: 'esnext',
     outDir: 'dist',
