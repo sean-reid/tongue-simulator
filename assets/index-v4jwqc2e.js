@@ -7181,7 +7181,7 @@ Error generating stack: ` + o.message + `
         });
     }
     const Ep = "modulepreload", Cp = function(e) {
-        return "/tongue-simulator/" + e;
+        return "/" + e;
     }, rs = {}, _p = function(t, n, r) {
         let l = Promise.resolve();
         if (n && n.length > 0) {
@@ -7212,7 +7212,7 @@ Error generating stack: ` + o.message + `
     let rl = null;
     async function ls() {
         if (rl) return;
-        const e = await _p(()=>import("./tongue_sim-DjqFOrBM.js"), []);
+        const e = await _p(()=>import("./tongue_sim-Cy9ETZhO.js"), []);
         await e.default(), rl = e;
     }
     class Au {
